@@ -28,6 +28,8 @@ export type CallControls = {
   stop: () => void;
   setMuted: (muted: boolean) => void;
   setHand: (up: boolean) => void;
+  shareWindow: () => Promise<void>;
+  stopShare: () => void;
 };
 
 export function startCall(options: {
@@ -40,10 +42,12 @@ export function startCall(options: {
   onRoster?: (names: string[]) => void;
   onHands?: (names: string[]) => void;
   onLocal: (stream: MediaStream | null) => void;
+  onScreen?: (stream: MediaStream | null) => void;
   onError: (error: string, ended?: boolean) => void;
 }): CallControls {
   let stopped = false;
   let local: MediaStream | null = null;
+  let screen: MediaStream | null = null;
   let socket: WebSocket | null = null;
   let userId = "";
   let relay = false;
@@ -65,6 +69,39 @@ export function startCall(options: {
         return;
       }
       socket.send(JSON.stringify({ type: "hand", up }));
+    },
+    async shareWindow() {
+      if (options.scope !== "course" || options.listen || stopped) {
+        return;
+      }
+      try {
+        const next = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        screen?.getTracks().forEach((track) => track.stop());
+        screen = next;
+        const track = next.getVideoTracks()[0];
+        if (!track) {
+          return;
+        }
+        track.onended = () => controls.stopShare();
+        for (const link of links.values()) {
+          link.pc.addTrack(track, next);
+        }
+        options.onScreen?.(next);
+      } catch {
+        options.onError("The window was not shared. The call is still open.");
+      }
+    },
+    stopShare() {
+      for (const link of links.values()) {
+        for (const sender of [...link.pc.getSenders()]) {
+          if (sender.track && screen?.getTracks().includes(sender.track)) {
+            link.pc.removeTrack(sender);
+          }
+        }
+      }
+      screen?.getTracks().forEach((track) => track.stop());
+      screen = null;
+      options.onScreen?.(null);
     },
   };
 
@@ -367,7 +404,7 @@ export function startCall(options: {
       return;
     }
     const states = [...links.values()].map((link) => link.pc.connectionState || link.pc.iceConnectionState);
-    if (states.every((state) => state === "connected" || state === "completed")) {
+    if (states.every((state) => state === "connected")) {
       options.onStatus(relay ? "Connected. The media server can relay this call." : "Connected on a direct path. The relay is not answering.");
       return;
     }
@@ -389,7 +426,10 @@ export function startCall(options: {
     options.onHands?.([]);
     local?.getTracks().forEach((track) => track.stop());
     local = null;
+    screen?.getTracks().forEach((track) => track.stop());
+    screen = null;
     options.onLocal(null);
+    options.onScreen?.(null);
     options.onPeers([]);
   }
 }

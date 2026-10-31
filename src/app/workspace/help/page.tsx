@@ -9,9 +9,9 @@ const articles = [
   ["discussions", "Discussions", "Pin, close, and reply. When a thread has points, the lecturer releases a grade by choosing the student's name. This is separate from the campus feed."],
   ["outcomes", "Outcomes", "Mastery averages the released scores on the assignments a lecturer links. If a score is hidden, it waits. There is no predicted grade. On the gradebook, you can type other numbers and see a total. Those numbers are not saved."],
   ["attendance", "Attendance", "You see your own present, late, absent, and excused counts. The lecturer can mark a whole session present, then change a single row."],
-  ["hours", "Office hours", "One student claims a published slot and can say what they need. That note stays on the slot. The host is notified in the app and by email. Either person can open the slot again."],
+  ["hours", "Office hours", "One student claims a published slot and can say what they need. A queue takes a reason and a place. When the lecturer marks it done, the note stays on the assignment they named. The host is notified in the app and by email. Either person can open a slot again."],
   ["tools", "Tools", "A tool opens a link and shows the site it leaves for. Campus+ does not collect a score from it, and it does not connect to Turnitin."],
-  ["live", "Live room", "The transcript stays on the course and updates when someone sends. Voice and video use the media server when it is running. Four people can speak and twenty-four can listen, nothing is recorded, and it is not a large voice network. When that server is stopped, the room stays text."],
+  ["live", "Live room", "The transcript stays on the course and updates when someone sends. Voice and video use the media server when it is running. Four people can speak and twenty-four can listen. A speaker can share one window. Nothing is recorded, and it is not a large voice network. When that server is stopped, the room stays text."],
   ["ask", "Ask the course", "A question goes to the people teaching the course. You see your own questions. It is not a social message and it does not start a chat with another student."],
   ["learning", "Learning system", "The LMS page can create a labelled sample. It does not connect to a live Canvas."],
 ];

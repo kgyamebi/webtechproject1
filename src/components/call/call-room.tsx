@@ -26,6 +26,7 @@ export function CallRoom({
   const [local, setLocal] = useState<MediaStream | null>(null);
   const [peers, setPeers] = useState<CallPeer[]>([]);
   const [roster, setRoster] = useState<string[]>([]);
+  const [screen, setScreen] = useState<MediaStream | null>(null);
   const [ready, setReady] = useState(false);
   const controls = useRef<CallControls | null>(null);
   const generation = useRef(0);
@@ -44,6 +45,7 @@ export function CallRoom({
     setListening(listen);
     setHand(false);
     setHands([]);
+    setScreen(null);
     setError("");
     const current = () => mine === generation.current;
     controls.current = startCall({
@@ -76,6 +78,11 @@ export function CallRoom({
           setLocal(stream);
         }
       },
+      onScreen: (stream) => {
+        if (current()) {
+          setScreen(stream);
+        }
+      },
       onError: (next, ended) => {
         if (!current()) {
           return;
@@ -90,6 +97,7 @@ export function CallRoom({
           setListening(false);
           setHand(false);
           setHands([]);
+          setScreen(null);
         }
       },
     });
@@ -109,6 +117,7 @@ export function CallRoom({
     setListening(false);
     setHand(false);
     setHands([]);
+    setScreen(null);
   }
 
   const soft = appearance === "phone" ? "text-[var(--screen-soft)]" : "text-ink-soft";
@@ -118,7 +127,7 @@ export function CallRoom({
     <section aria-label="Call" data-ready={ready ? "true" : "false"} className={appearance === "desk" ? "mt-6 max-w-xl border-t border-line pt-4" : `border-b ${rule} px-3 py-2`}>
       <p className={`text-[11px] leading-5 ${soft}`}>
         {scope === "course"
-          ? "Four people can speak. Twenty-four others can listen. Nothing is recorded. Each speaker’s browser carries the listeners, so this is a seminar, not a large voice network."
+          ? "Four people can speak. Twenty-four others can listen. A speaker can share one window. Nothing is recorded. Each speaker’s browser carries the listeners, so this is a seminar, not a large voice network."
           : "Up to 4 people. Nothing is recorded."}
         {relay
           ? " The media server relays the call when a direct path is blocked."
@@ -142,6 +151,7 @@ export function CallRoom({
         <div className="mt-2 grid gap-2">
           <div className="grid grid-cols-2 gap-2">
             {camera && local ? <StreamVideo stream={local} muted label="Your camera" /> : null}
+            {screen ? <StreamVideo stream={screen} muted label="Your window. Nothing is recorded." /> : null}
             {peers.filter((peer) => peer.video).map((peer) => (
               <StreamVideo key={peer.userId} stream={peer.stream} label={peer.name} />
             ))}
@@ -158,6 +168,11 @@ export function CallRoom({
           {listening ? <p className={`text-xs ${soft}`}>You are listening. Your microphone is off.</p> : !camera ? <p className={`text-xs ${soft}`}>Your microphone is on.</p> : null}
           {hands.length > 0 ? <p className={`text-xs ${soft}`}>{hands.join(", ")} raised a hand.</p> : null}
           <div className="flex flex-wrap gap-2">
+            {scope === "course" && !listening ? (
+              <Button type="button" size="sm" variant="secondary" onClick={() => void (screen ? controls.current?.stopShare() : controls.current?.shareWindow())}>
+                {screen ? "Stop sharing" : "Share a window"}
+              </Button>
+            ) : null}
             {listening ? null : (
             <Button
               type="button"

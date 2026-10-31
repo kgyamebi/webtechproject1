@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { createStoryAction } from "@/server/social/actions";
 
-export function StoryComposer() {
+export function StoryComposer({ friends = [] }: { friends?: { id: string; name: string }[] }) {
   const [preview, setPreview] = useState("");
 
   return (
@@ -32,6 +32,18 @@ export function StoryComposer() {
       <Field label="Caption" name="caption">
         <Input id="caption" name="caption" maxLength={140} />
       </Field>
+      {friends.length > 0 ? (
+        <fieldset className="grid gap-2">
+          <legend className="text-sm">Named circle</legend>
+          <p className="text-xs text-ink-soft">Leave everyone unchecked and every friend can see it. Check people to limit this story to them.</p>
+          {friends.map((friend) => (
+            <label key={friend.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="circle" value={friend.id} />
+              {friend.name}
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
       <Button type="submit">Share for 24 hours</Button>
     </form>
   );

@@ -5,6 +5,7 @@ import { requireUser } from "@/server/auth/current";
 import { prisma } from "@/server/db/client";
 import { safeHttpUrl, simulatedImportShouldBeRemoved } from "@/server/academic/rules";
 import { listDeadlines } from "@/server/academic/actions";
+import { clashesWith } from "@/lib/campus-loop";
 import { quietLabel } from "@/server/social/rules";
 
 function refresh(paths: string[]) {
@@ -20,7 +21,22 @@ export async function listEvents() {
     include: { saves: { where: { userId } } },
     take: 50,
   });
-  return events.map((event) => ({ ...event, saved: event.saves.length > 0 }));
+  const quizzes = await prisma.quiz.findMany({
+    where: { published: true, closeAt: { not: null }, course: { enrollments: { some: { userId } } } },
+    select: { title: true, closeAt: true },
+  });
+  const assignments = await prisma.assignment.findMany({
+    where: { published: true, course: { enrollments: { some: { userId } } } },
+    select: { title: true, dueAt: true },
+  });
+  return events.map((event) => ({
+    ...event,
+    saved: event.saves.length > 0,
+    clashes: [
+      ...quizzes.flatMap((quiz) => (quiz.closeAt && clashesWith(event.startsAt, quiz.closeAt) ? [quiz.title] : [])),
+      ...assignments.flatMap((assignment) => (clashesWith(event.startsAt, assignment.dueAt) ? [assignment.title] : [])),
+    ],
+  }));
 }
 
 export async function createEventAction(formData: FormData) {

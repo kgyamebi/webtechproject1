@@ -6,6 +6,7 @@ import { Card, CardText, CardTitle } from "@/components/ui/card";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { canReadGrade, canStartAttempt } from "@/server/academic/rules";
 import { addQuestionAction, gradeEssayAction, loadQuiz, publishQuizAction, releaseQuizAction, startQuizAction, submitQuizAction } from "@/server/academic/actions";
+import { optInReviewAction, reviewForQuiz } from "@/server/campus-loop/actions";
 
 export const metadata = { title: "Quiz" };
 
@@ -31,6 +32,7 @@ export default async function QuizPage({
     attemptLimit: quiz.attemptLimit,
     hasOpenAttempt: Boolean(open),
   });
+  const review = isStaff ? null : await reviewForQuiz(quiz.id);
   const questions = quiz.shuffleQuestions && open
     ? [...quiz.questions].sort((left, right) => (open.id + left.id).localeCompare(open.id + right.id))
     : quiz.questions;
@@ -112,6 +114,26 @@ export default async function QuizPage({
               : null}
           </Card>
         ))}
+      {review && review.missed.length > 0 ? (
+        <Card>
+          <CardTitle>Review a missed question</CardTitle>
+          <CardText>The score stays on the attempt above. Names appear only after you opt in, and only for people who opted in too.</CardText>
+          {review.missed.map((item) => (
+            <div key={item.questionId} className="mt-3 text-sm">
+              <p>{item.prompt}</p>
+              {item.optedIn ? (
+                <p className="text-ink-soft">{item.names.length ? item.names.join(", ") : "You are the only person opted in so far."}</p>
+              ) : (
+                <form action={optInReviewAction} className="mt-2">
+                  <input type="hidden" name="quizId" value={quiz.id} />
+                  <input type="hidden" name="questionId" value={item.questionId} />
+                  <Button type="submit" size="sm" variant="secondary">Join a review</Button>
+                </form>
+              )}
+            </div>
+          ))}
+        </Card>
+      ) : null}
       {isStaff ? (
         <>
           <Card>

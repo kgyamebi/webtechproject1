@@ -83,7 +83,7 @@ export const featureRegister: FeatureEntry[] = [
     name: "Messaging",
     stage: 5,
     status: "implemented-not-fully-tested",
-    summary: "Direct messages between friends, plus group conversations.",
+    summary: "Direct messages and groups, with replies, reactions, pins, search, polls, voice notes, files, and a short unsend window.",
     href: "/workspace/messages",
   },
   {

@@ -3,16 +3,34 @@ import { Card, CardText, CardTitle } from "@/components/ui/card";
 import { Field, Select, Textarea } from "@/components/ui/field";
 import { EmptyState } from "@/components/ui/states";
 import { commentAction, createPostAction, deletePostAction, listFeed, reactPostAction } from "@/server/social/actions";
+import { feedGate } from "@/server/campus-loop/actions";
 
 export const metadata = { title: "Feed" };
 
 export default async function FeedPage() {
+  const gate = await feedGate();
+  if (gate.sleeping) {
+    return (
+      <div className="grid gap-4">
+        <h1 className="font-display text-4xl">Feed</h1>
+        <p className="max-w-xl text-sm leading-6 text-ink-soft">
+          The feed is sleeping until {gate.wakes}. Friends and course alerts still arrive.
+          {gate.quiz ? ` ${gate.quiz.courseTitle} has ${gate.quiz.title} coming up.` : ""}
+        </p>
+      </div>
+    );
+  }
   const posts = await listFeed();
 
   return (
     <div className="grid gap-6">
       <div>
         <h1 className="font-display text-4xl">Feed</h1>
+        {gate.quiz ? (
+          <p className="mt-3 max-w-xl text-sm leading-6 text-ink">
+            {gate.quiz.courseTitle} steps forward. {gate.quiz.title} closes {gate.quiz.closeAt.toLocaleString()}. The posts stay below.
+          </p>
+        ) : null}
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
           Friends see a Friends post. A university post is limited to people at your institution. Comments and reactions stay on this page.
         </p>

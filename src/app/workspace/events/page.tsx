@@ -112,6 +112,7 @@ function EventList({
     linkUrl: string;
     saved: boolean;
     kind: string;
+    clashes: string[];
   }>;
   empty: string;
   now: number;
@@ -133,6 +134,9 @@ function EventList({
             <a className="mt-2 inline-block text-sm text-pine underline-offset-4 hover:underline" href={event.linkUrl}>
               Event link
             </a>
+          ) : null}
+          {event.clashes.length > 0 ? (
+            <p className="mt-2 text-sm text-ink">This overlaps {event.clashes.join(", ")}. Saving still adds it to your desk.</p>
           ) : null}
           <form action={saveEventAction} className="mt-3">
             <input type="hidden" name="eventId" value={event.id} />

@@ -1,6 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardText, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/states";
+import { Field, Input } from "@/components/ui/field";
+import { endWalkAction, arriveWalkAction, friendWalkChoices, startWalkCheckAction } from "@/server/campus-loop/actions";
 import {
   blockPersonAction,
   cancelFriendRequestAction,
@@ -15,6 +17,7 @@ export const metadata = { title: "Friends" };
 
 export default async function FriendsPage() {
   const desk = await listFriendDesk();
+  const walks = await friendWalkChoices();
 
   return (
     <div className="grid gap-6">
@@ -119,6 +122,43 @@ export default async function FriendsPage() {
             </form>
           </Card>
         ))}
+      </section>
+      <section className="grid gap-3">
+        <h2 className="font-display text-2xl">Walk check-in</h2>
+        <p className="max-w-xl text-sm leading-6 text-ink-soft">
+          Name a place and a time for one friend. They hear only if you have not arrived by then, and only inside Campus+. There is no map.
+        </p>
+        {walks.walks.map((walk) => (
+          <Card key={walk.id}>
+            <CardTitle>{walk.place}</CardTitle>
+            <CardText>Due {walk.dueAt.toLocaleString()}. Your friend is not told before that time.</CardText>
+            <div className="mt-3 flex gap-2">
+              <form action={arriveWalkAction}>
+                <input type="hidden" name="id" value={walk.id} />
+                <Button type="submit" size="sm">I arrived</Button>
+              </form>
+              <form action={endWalkAction}>
+                <input type="hidden" name="id" value={walk.id} />
+                <Button type="submit" size="sm" variant="secondary">End</Button>
+              </form>
+            </div>
+          </Card>
+        ))}
+        {walks.people.length > 0 ? (
+          <form action={startWalkCheckAction} className="grid max-w-md gap-3">
+            <label className="grid gap-1 text-sm">
+              One friend
+              <select name="friendId" className="h-11 rounded-xl border border-line bg-transparent px-3" required>
+                {walks.people.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </label>
+            <Field label="Place" name="place"><Input id="place" name="place" required maxLength={80} /></Field>
+            <Field label="Tell them if I am not there by" name="dueAt"><Input id="dueAt" name="dueAt" type="datetime-local" required /></Field>
+            <Button type="submit">Start check-in</Button>
+          </form>
+        ) : null}
       </section>
     </div>
   );

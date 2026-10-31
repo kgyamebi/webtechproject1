@@ -74,14 +74,18 @@ export function isSafeUploadPath(storedPath: string): boolean {
     return false;
   }
 
-  return /^uploads\/[A-Za-z0-9_-]+\/[0-9a-f-]{36}\.(jpg|png|webp|pdf)$/i.test(storedPath);
+  return /^uploads\/[A-Za-z0-9_-]+\/[0-9a-f-]{36}\.(jpg|png|webp|pdf|webm|ogg)$/i.test(storedPath);
 }
 
-export function uploadStoragePath(userId: string, fileId: string, extension: "jpg" | "png" | "webp" | "pdf"): string {
+export function uploadStoragePath(
+  userId: string,
+  fileId: string,
+  extension: "jpg" | "png" | "webp" | "pdf" | "webm" | "ogg",
+): string {
   return `uploads/${userId}/${fileId}.${extension}`;
 }
 
-export function sniffUpload(bytes: Uint8Array): "jpg" | "png" | "webp" | "pdf" | null {
+export function sniffUpload(bytes: Uint8Array): "jpg" | "png" | "webp" | "pdf" | "webm" | "ogg" | null {
   const image = sniffImageMime(bytes);
   if (image === "image/jpeg") {
     return "jpg";
@@ -94,6 +98,12 @@ export function sniffUpload(bytes: Uint8Array): "jpg" | "png" | "webp" | "pdf" |
   }
   if (bytes.length >= 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
     return "pdf";
+  }
+  if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+    return "webm";
+  }
+  if (bytes.length >= 4 && bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+    return "ogg";
   }
   return null;
 }

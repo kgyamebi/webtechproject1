@@ -93,8 +93,9 @@ export async function saveUpload(userId: string, bytes: Uint8Array, imagesOnly =
   }
 
   const extension = sniffUpload(bytes);
-  if (!extension || (imagesOnly && extension === "pdf")) {
-    throw new Error(imagesOnly ? "Use a JPEG, PNG, or WebP image." : "Use a JPEG, PNG, WebP, or PDF file.");
+  const image = extension === "jpg" || extension === "png" || extension === "webp";
+  if (!extension || (imagesOnly && !image)) {
+    throw new Error(imagesOnly ? "Use a JPEG, PNG, or WebP image." : "Use an image, a PDF, or a short voice note.");
   }
 
   const relativePath = uploadStoragePath(userId, crypto.randomUUID(), extension);
@@ -131,7 +132,11 @@ export async function readUpload(relativePath: string): Promise<{ bytes: Buffer;
           ? "image/png"
           : extension === "webp"
             ? "image/webp"
-            : "image/jpeg";
+            : extension === "webm"
+              ? "audio/webm"
+              : extension === "ogg"
+                ? "audio/ogg"
+                : "image/jpeg";
     return { bytes, contentType };
   } catch {
     return null;

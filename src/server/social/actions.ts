@@ -6,6 +6,7 @@ import { requireUser } from "@/server/auth/current";
 import { prisma } from "@/server/db/client";
 import { notifyUser } from "@/server/notifications";
 import { ageBandFromBirth } from "@/server/identity/policy";
+import { UNSEND_MS } from "@/lib/campus-loop";
 import { saveUpload } from "@/server/media/storage";
 import {
   applyQuietAccept,
@@ -661,7 +662,7 @@ export async function createGroupAction(formData: FormData) {
   redirect(`/workspace/messages/${created.id}`);
 }
 
-export async function loadConversation(id: string) {
+export async function loadConversation(id: string, query = "") {
   const { userId } = await requireUser();
   const membership = await prisma.conversationMember.findUnique({
     where: { conversationId_userId: { conversationId: id, userId } },
@@ -669,11 +670,57 @@ export async function loadConversation(id: string) {
   if (!membership) {
     return null;
   }
+  const now = new Date();
+  const due = await prisma.message.findMany({
+    where: { conversationId: id, notified: false, visibleAt: { lte: now }, deletedAt: null },
+  });
+  for (const message of due) {
+    const members = await prisma.conversationMember.findMany({ where: { conversationId: id } });
+    for (const member of members) {
+      if (member.userId !== message.senderId && !member.muted) {
+        await notifyUser({
+          userId: member.userId,
+          kind: "MESSAGE",
+          title: "New message",
+          body: "A scheduled message has arrived.",
+          href: `/workspace/messages/${id}`,
+          preference: "notifyMessages",
+        });
+      }
+    }
+    await prisma.message.update({ where: { id: message.id }, data: { notified: true } });
+  }
+  const needle = query.trim();
   const conversation = await prisma.conversation.findUnique({
     where: { id },
     include: {
-      messages: { orderBy: { createdAt: "asc" }, take: 100, include: { sender: { select: { id: true, name: true } }, reactions: true } },
-      members: { include: { user: { select: { name: true } } } },
+      messages: {
+        where: {
+          AND: [
+            { OR: [{ visibleAt: { lte: now } }, { senderId: userId }] },
+            needle ? { body: { contains: needle, mode: "insensitive" } } : {},
+          ],
+        },
+        orderBy: { createdAt: "asc" },
+        take: 100,
+        include: {
+          sender: { select: { id: true, name: true } },
+          reactions: true,
+          parent: { select: { body: true, sender: { select: { name: true } } } },
+          poll: { include: { options: { include: { votes: true } } } },
+        },
+      },
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              profile: { select: { presence: true, shareReadReceipts: true, shareTyping: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!conversation) {
@@ -681,7 +728,7 @@ export async function loadConversation(id: string) {
   }
   await prisma.conversationMember.update({
     where: { conversationId_userId: { conversationId: id, userId } },
-    data: { lastReadAt: new Date() },
+    data: { lastReadAt: now },
   });
   return { ...conversation, viewerId: userId, muted: membership.muted };
 }
@@ -698,11 +745,32 @@ async function deliverMessage(formData: FormData) {
   const viewer = await requireUser();
   const conversationId = String(formData.get("conversationId") ?? "");
   const body = String(formData.get("body") ?? "").trim();
+  const parentId = String(formData.get("parentId") ?? "");
+  const file = formData.get("file");
+  let attachmentPath: string | null = null;
+  let attachmentName: string | null = null;
+  if (file instanceof File && file.size > 0) {
+    try {
+      attachmentPath = await saveUpload(viewer.userId, new Uint8Array(await file.arrayBuffer()));
+      attachmentName = file.name.slice(0, 120);
+    } catch {
+      return { ok: false as const, reason: "That file could not be stored. Use an image, a PDF, or a voice note under 2 MB." };
+    }
+  }
+  const requested = new Date(String(formData.get("visibleAt") ?? ""));
+  const visibleAt = !Number.isNaN(requested.getTime()) && requested.getTime() > Date.now() + 30_000 ? requested : new Date();
+  const scheduled = visibleAt.getTime() > Date.now();
   const membership = await prisma.conversationMember.findUnique({
     where: { conversationId_userId: { conversationId, userId: viewer.userId } },
   });
-  if (!membership || !body || body.length > 2000) {
+  if (!membership || (!body && !attachmentPath) || body.length > 2000) {
     return { ok: false as const, reason: body.length > 2000 ? "Keep a message under 2000 characters." : "That message could not be sent." };
+  }
+  if (parentId) {
+    const parent = await prisma.message.findUnique({ where: { id: parentId }, select: { conversationId: true } });
+    if (!parent || parent.conversationId !== conversationId) {
+      return { ok: false as const, reason: "That reply could not be attached." };
+    }
   }
   const members = await prisma.conversationMember.findMany({ where: { conversationId } });
   for (const member of members) {
@@ -710,17 +778,31 @@ async function deliverMessage(formData: FormData) {
       return { ok: false as const, reason: "A block stops this message." };
     }
   }
-  await prisma.message.create({ data: { conversationId, senderId: viewer.userId, body } });
-  for (const member of members) {
-    if (member.userId !== viewer.userId && !member.muted) {
-      await notifyUser({
-        userId: member.userId,
-        kind: "MESSAGE",
-        title: "New message",
-        body: `${viewer.name} sent a message.`,
-        href: `/workspace/messages/${conversationId}`,
-        preference: "notifyMessages",
-      });
+  await prisma.message.create({
+    data: {
+      conversationId,
+      senderId: viewer.userId,
+      body: body || (attachmentName ? attachmentName : ""),
+      parentId: parentId || null,
+      visibleAt,
+      notified: !scheduled,
+      kind: attachmentPath ? "file" : "text",
+      attachmentPath,
+      attachmentName,
+    },
+  });
+  if (!scheduled) {
+    for (const member of members) {
+      if (member.userId !== viewer.userId && !member.muted) {
+        await notifyUser({
+          userId: member.userId,
+          kind: "MESSAGE",
+          title: "New message",
+          body: `${viewer.name} sent a message.`,
+          href: `/workspace/messages/${conversationId}`,
+          preference: "notifyMessages",
+        });
+      }
     }
   }
   refresh([`/workspace/messages/${conversationId}`, "/workspace/messages", `/workspace/connect/chat/${conversationId}`, "/workspace/connect"]);
@@ -746,11 +828,116 @@ export async function editMessageAction(formData: FormData) {
 export async function deleteMessageAction(formData: FormData) {
   const { userId } = await requireUser();
   const message = await prisma.message.findUnique({ where: { id: String(formData.get("messageId") ?? "") } });
-  if (!message || message.senderId !== userId) {
+  if (!message || message.senderId !== userId || message.deletedAt) {
+    return;
+  }
+  if (Date.now() - message.createdAt.getTime() > UNSEND_MS) {
     return;
   }
   await prisma.message.update({ where: { id: message.id }, data: { deletedAt: new Date(), body: "" } });
   refresh([`/workspace/messages/${message.conversationId}`]);
+}
+
+export async function pinMessageAction(formData: FormData) {
+  const { userId } = await requireUser();
+  const message = await prisma.message.findUnique({ where: { id: String(formData.get("messageId") ?? "") } });
+  if (!message || message.deletedAt) {
+    return;
+  }
+  const membership = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId: message.conversationId, userId } },
+  });
+  if (!membership) {
+    return;
+  }
+  await prisma.message.update({
+    where: { id: message.id },
+    data: { pinnedAt: message.pinnedAt ? null : new Date() },
+  });
+  refresh([`/workspace/messages/${message.conversationId}`]);
+}
+
+export async function createPollAction(formData: FormData) {
+  const viewer = await requireUser();
+  const conversationId = String(formData.get("conversationId") ?? "");
+  const question = String(formData.get("question") ?? "").trim();
+  const labels = ["option1", "option2", "option3"]
+    .map((name) => String(formData.get(name) ?? "").trim())
+    .filter((label) => label.length > 0)
+    .slice(0, 3);
+  if (question.length < 2 || labels.length < 2) {
+    return;
+  }
+  const membership = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId: viewer.userId } },
+  });
+  if (!membership) {
+    return;
+  }
+  const message = await prisma.message.create({
+    data: { conversationId, senderId: viewer.userId, body: question.slice(0, 200), kind: "poll" },
+  });
+  await prisma.messagePoll.create({
+    data: {
+      messageId: message.id,
+      options: { create: labels.map((label) => ({ label: label.slice(0, 80) })) },
+    },
+  });
+  refresh([`/workspace/messages/${conversationId}`]);
+}
+
+export async function votePollAction(formData: FormData) {
+  const { userId } = await requireUser();
+  const optionId = String(formData.get("optionId") ?? "");
+  const option = await prisma.messagePollOption.findUnique({
+    where: { id: optionId },
+    include: { poll: { include: { message: true, options: true } } },
+  });
+  if (!option) {
+    return;
+  }
+  const membership = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId: option.poll.message.conversationId, userId } },
+  });
+  if (!membership) {
+    return;
+  }
+  const optionIds = option.poll.options.map((item) => item.id);
+  await prisma.messagePollVote.deleteMany({ where: { userId, optionId: { in: optionIds } } });
+  await prisma.messagePollVote.create({ data: { optionId, userId } });
+  refresh([`/workspace/messages/${option.poll.message.conversationId}`]);
+}
+
+export async function sendVoiceNoteAction(formData: FormData) {
+  const viewer = await requireUser();
+  const conversationId = String(formData.get("conversationId") ?? "");
+  const audio = formData.get("audio");
+  if (!(audio instanceof File) || audio.size === 0 || audio.size > 2 * 1024 * 1024) {
+    return;
+  }
+  const membership = await prisma.conversationMember.findUnique({
+    where: { conversationId_userId: { conversationId, userId: viewer.userId } },
+  });
+  if (!membership) {
+    return;
+  }
+  let attachmentPath: string;
+  try {
+    attachmentPath = await saveUpload(viewer.userId, new Uint8Array(await audio.arrayBuffer()));
+  } catch {
+    return;
+  }
+  await prisma.message.create({
+    data: {
+      conversationId,
+      senderId: viewer.userId,
+      body: "Voice note",
+      kind: "voice",
+      attachmentPath,
+      attachmentName: "Voice note",
+    },
+  });
+  refresh([`/workspace/messages/${conversationId}`]);
 }
 
 export async function reactMessageAction(formData: FormData) {
@@ -970,6 +1157,13 @@ export async function createStoryAction(formData: FormData) {
   } catch {
     return;
   }
+  const requested = formData.getAll("circle").map((value) => String(value)).filter(Boolean);
+  const circle: string[] = [];
+  for (const friendId of requested) {
+    if (friendId !== userId && (await areFriends(userId, friendId)) && !(await blockedBetween(userId, friendId))) {
+      circle.push(friendId);
+    }
+  }
   await prisma.story.create({
     data: {
       authorId: userId,
@@ -977,9 +1171,23 @@ export async function createStoryAction(formData: FormData) {
       caption: String(formData.get("caption") ?? "").slice(0, 140),
       audience: "CONNECTIONS",
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      circle: circle.length ? { create: circle.map((friendId) => ({ userId: friendId })) } : undefined,
     },
   });
   refresh(["/workspace/stories"]);
+}
+
+export async function listCircleFriends() {
+  const { userId } = await requireUser();
+  const ids = await friendIds(userId);
+  if (ids.length === 0) {
+    return [];
+  }
+  return prisma.user.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 }
 
 export async function listStories() {
@@ -987,7 +1195,7 @@ export async function listStories() {
   const stories = await prisma.story.findMany({
     where: { expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
-    include: { author: { select: { id: true, name: true } } },
+    include: { author: { select: { id: true, name: true } }, circle: { select: { userId: true } } },
   });
   const mutes = await prisma.storyMute.findMany({ where: { userId } });
   const muted = new Set(mutes.map((item) => item.authorId));
@@ -1006,11 +1214,50 @@ export async function listStories() {
       sameInstitution: await sameInstitution(userId, story.authorId),
       expired: story.expiresAt <= new Date(),
     });
-    if (allowed) {
-      visible.push(story);
+    if (!allowed) {
+      continue;
     }
+    if (story.circle.length > 0 && story.authorId !== userId && !story.circle.some((row) => row.userId === userId)) {
+      continue;
+    }
+    visible.push(story);
   }
   return visible;
+}
+
+export async function saveCommunityHighlightAction(formData: FormData) {
+  const { userId } = await requireUser();
+  const communityId = String(formData.get("communityId") ?? "");
+  const membership = await prisma.communityMember.findUnique({
+    where: { communityId_userId: { communityId, userId } },
+  });
+  if (!membership || membership.pending || membership.role !== "MODERATOR") {
+    const community = await prisma.community.findUnique({ where: { id: communityId }, select: { createdById: true } });
+    if (!community || community.createdById !== userId) {
+      return;
+    }
+  }
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) {
+    return;
+  }
+  let imagePath: string;
+  try {
+    imagePath = await saveUpload(userId, new Uint8Array(await file.arrayBuffer()), true);
+  } catch {
+    return;
+  }
+  await prisma.communityHighlight.upsert({
+    where: { communityId },
+    update: { imagePath, caption: String(formData.get("caption") ?? "").slice(0, 140), savedById: userId },
+    create: {
+      communityId,
+      imagePath,
+      caption: String(formData.get("caption") ?? "").slice(0, 140),
+      savedById: userId,
+    },
+  });
+  refresh([`/workspace/communities/${communityId}`]);
 }
 
 export async function deleteStoryAction(formData: FormData) {
@@ -1148,6 +1395,7 @@ export async function loadCommunity(id: string) {
   const community = await prisma.community.findUnique({
     where: { id },
     include: {
+      highlight: true,
       members: { include: { user: { select: { id: true, name: true } } } },
       posts: {
         orderBy: { createdAt: "desc" },

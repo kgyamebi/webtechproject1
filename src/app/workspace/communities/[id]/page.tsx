@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardText, CardTitle } from "@/components/ui/card";
-import { Field, Textarea } from "@/components/ui/field";
-import { commentAction, createPostAction, decideMemberAction, leaveCommunityAction, loadCommunity } from "@/server/social/actions";
+import { Field, Input, Textarea } from "@/components/ui/field";
+import { commentAction, createPostAction, decideMemberAction, leaveCommunityAction, loadCommunity, saveCommunityHighlightAction } from "@/server/social/actions";
 
 export const metadata = { title: "Community" };
 
@@ -20,6 +20,26 @@ export default async function CommunityPage({ params }: { params: Promise<{ id: 
         <h1 className="font-display text-4xl">{community.name}</h1>
         <p className="mt-2 text-sm text-ink-soft">{community.description}</p>
       </div>
+      {community.highlight ? (
+        <Card>
+          <CardTitle>Highlight</CardTitle>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`/api/media/highlight/${community.id}`} alt={community.highlight.caption || "Club highlight"} className="mt-3 max-h-72 w-full rounded-2xl object-cover" />
+          <CardText>{community.highlight.caption}</CardText>
+        </Card>
+      ) : null}
+      {mine && !mine.pending && (mine.role === "MODERATOR" || community.createdById === mine.userId) ? (
+        <Card>
+          <CardTitle>{community.highlight ? "Replace the highlight" : "Save one highlight"}</CardTitle>
+          <CardText>One image for this club. It stays after stories expire.</CardText>
+          <form action={saveCommunityHighlightAction} className="mt-3 grid gap-3">
+            <input type="hidden" name="communityId" value={community.id} />
+            <Field label="Image" name="image"><Input id="highlight-image" name="image" type="file" accept="image/jpeg,image/png,image/webp" required /></Field>
+            <Field label="Caption" name="caption"><Input id="highlight-caption" name="caption" maxLength={140} /></Field>
+            <Button type="submit" size="sm">Save highlight</Button>
+          </form>
+        </Card>
+      ) : null}
       {restricted ? (
         <Card>
           <CardTitle>Private community</CardTitle>

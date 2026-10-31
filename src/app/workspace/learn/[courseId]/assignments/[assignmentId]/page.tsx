@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardText, CardTitle } from "@/components/ui/card";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { canReadGrade, submissionAccepted } from "@/server/academic/rules";
+import {
+  addDecisionAction,
+  assignmentLoop,
+  startDeskTogetherAction,
+  thankClassmateAction,
+} from "@/server/campus-loop/actions";
 import { gradeSubmissionAction, loadAssignment, submitAssignmentAction } from "@/server/academic/actions";
 import { addRubricCriterionAction, addRubricLevelAction, addSubmissionNoteAction, loadMarking, markRubricAction } from "@/server/academic/studio";
 
@@ -25,6 +31,7 @@ export default async function AssignmentPage({
   const window = submissionAccepted(new Date(), assignment.dueAt, assignment.allowLate);
   const graded = mine?.points !== null && mine?.points !== undefined;
   const marking = await loadMarking(courseId, assignmentId);
+  const loop = await assignmentLoop(assignmentId);
 
   return (
     <div className="grid gap-6">
@@ -66,6 +73,61 @@ export default async function AssignmentPage({
             })}
           </ul>
         </section>
+      ) : null}
+      {loop ? (
+        <Card>
+          <CardTitle>With this assignment</CardTitle>
+          <form action={startDeskTogetherAction} className="mt-3 grid gap-2">
+            <input type="hidden" name="assignmentId" value={assignment.id} />
+            <input type="hidden" name="showFriends" value="on" />
+            <p className="text-sm text-ink-soft">
+              {loop.sessionEnds
+                ? `Friends can see you are on this until ${loop.sessionEnds.toLocaleTimeString()}. No camera.`
+                : "Show friends you are on this for 25 minutes. No camera."}
+            </p>
+            {loop.together.map((person) => (
+              <p key={person.name} className="text-sm">{person.name} is on this until {person.endsAt.toLocaleTimeString()}.</p>
+            ))}
+            <Button type="submit" size="sm" variant="secondary">{loop.sessionEnds ? "Stop showing this" : "Show friends I am here"}</Button>
+          </form>
+          <div className="mt-4 grid gap-2">
+            <p className="text-sm font-medium">Decisions that stay with the submission</p>
+            {loop.decisions.length === 0 ? <p className="text-sm text-ink-soft">No decision yet.</p> : null}
+            {loop.decisions.map((decision) => (
+              <p key={decision.id} className="text-sm">{decision.authorName}: {decision.body}</p>
+            ))}
+            <form action={addDecisionAction} className="grid gap-2">
+              <input type="hidden" name="assignmentId" value={assignment.id} />
+              <Textarea name="body" aria-label="Decision" maxLength={280} />
+              <Button type="submit" size="sm" variant="secondary">Add decision</Button>
+            </form>
+          </div>
+          {loop.notes.length > 0 ? (
+            <div className="mt-4 grid gap-1">
+              <p className="text-sm font-medium">Office-hours note</p>
+              {loop.notes.map((note) => (
+                <p key={note.id} className="text-sm text-ink-soft">{note.studentName}: {note.note}</p>
+              ))}
+            </div>
+          ) : null}
+          {!isStaff && loop.classmates.length > 0 ? (
+            <form action={thankClassmateAction} className="mt-4 grid gap-2">
+              <input type="hidden" name="assignmentId" value={assignment.id} />
+              <label className="grid gap-1 text-sm">
+                Thank one classmate once
+                <select name="toUserId" className="h-11 rounded-xl border border-line bg-transparent px-3" defaultValue="">
+                  <option value="">Choose</option>
+                  {loop.classmates.map((person) => (
+                    <option key={person.id} value={person.id}>{person.name}</option>
+                  ))}
+                </select>
+              </label>
+              <Button type="submit" size="sm" variant="secondary" disabled={Boolean(loop.thankedUserId)}>
+                {loop.thankedUserId ? "Thanks sent" : "Thank them"}
+              </Button>
+            </form>
+          ) : null}
+        </Card>
       ) : null}
       {!isStaff && !archived ? (
         <Card>

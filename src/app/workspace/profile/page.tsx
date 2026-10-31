@@ -9,6 +9,7 @@ import { Field, Input } from "@/components/ui/field";
 import { updateInterestsAction } from "@/server/social/actions";
 import { getOrCreateProfile, getPrimaryMembership, listOpenInstitutions } from "@/server/identity/records";
 import { ageBandFromBirth } from "@/server/identity/policy";
+import { helpedCourses } from "@/server/campus-loop/actions";
 
 export const metadata = { title: "Profile" };
 
@@ -25,6 +26,7 @@ export default async function ProfilePage() {
     getPrimaryMembership(session.user.id),
     listOpenInstitutions(),
   ]);
+  const helped = await helpedCourses(session.user.id);
 
   return (
     <div className="grid gap-6">
@@ -46,6 +48,7 @@ export default async function ProfilePage() {
           </Link>
           .
         </p>
+        {helped.length > 0 ? <p className="mt-3 text-sm text-ink-soft">Helped on {helped.join(", ")}.</p> : null}
       </div>
       <Card>
         <CardTitle>Photo</CardTitle>

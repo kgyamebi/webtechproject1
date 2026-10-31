@@ -20,6 +20,7 @@ import {
 } from "@/server/academic/actions";
 import { StudioNav } from "@/components/academic/studio-nav";
 import { createPostAction } from "@/server/social/actions";
+import { postTaskOfferAction, removeTaskOfferAction, taskBoard } from "@/server/campus-loop/actions";
 import { submissionAccepted } from "@/server/academic/rules";
 
 export const metadata = { title: "Course" };
@@ -33,6 +34,7 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
   const { course, isStaff, viewerId } = loaded;
   const now = new Date();
   const teachers = course.staff.map((member) => member.user.name);
+  const tasks = await taskBoard(courseId);
 
   return (
     <div className="grid gap-6">
@@ -44,6 +46,41 @@ export default async function CoursePage({ params }: { params: Promise<{ courseI
         <CourseProgress course={course} />
         <NextStep course={course} isStaff={isStaff} now={now} />
         <RemainingWork course={course} isStaff={isStaff} now={now} />
+        {tasks ? (
+          <section className="mt-8 max-w-xl">
+            <h2 className="font-display text-2xl">Free for this course</h2>
+            <p className="mt-2 text-sm leading-6 text-ink-soft">Same course and same age band. Names and times only. Photos are not used to order this list.</p>
+            <ul className="mt-3 grid gap-2 text-sm">
+              {tasks.offers.map((offer) => (
+                <li key={offer.id}>
+                  {offer.name} finished {offer.finishedLabel}. Free {offer.freeStart.toLocaleString()} – {offer.freeEnd.toLocaleTimeString()}.
+                  {offer.mine ? (
+                    <form action={removeTaskOfferAction} className="mt-1">
+                      <input type="hidden" name="id" value={offer.id} />
+                      <Button type="submit" size="sm" variant="ghost">Remove</Button>
+                    </form>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            {tasks.finished.length > 0 ? (
+              <form action={postTaskOfferAction} className="mt-4 grid gap-2">
+                <input type="hidden" name="courseId" value={course.id} />
+                <label className="grid gap-1 text-sm">
+                  Finished work
+                  <select name="finishedLabel" className="h-11 rounded-xl border border-line bg-transparent px-3">
+                    {tasks.finished.map((label) => (
+                      <option key={label} value={label}>{label}</option>
+                    ))}
+                  </select>
+                </label>
+                <Field label="Free from" name="freeStart"><Input id="freeStart" name="freeStart" type="datetime-local" required /></Field>
+                <Field label="Free until" name="freeEnd"><Input id="freeEnd" name="freeEnd" type="datetime-local" required /></Field>
+                <Button type="submit" size="sm">Post a free window</Button>
+              </form>
+            ) : null}
+          </section>
+        ) : null}
         <nav aria-label="Course sections" className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <a className="text-ink-soft underline-offset-4 hover:text-ink hover:underline" href="#modules">Modules</a>
           <a className="text-ink-soft underline-offset-4 hover:text-ink hover:underline" href="#assignments">Assignments</a>

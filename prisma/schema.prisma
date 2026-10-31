@@ -87,6 +87,18 @@ model User {
   accountRestriction     AccountRestriction?
   personalEvents         PersonalEvent[]
   moderationActions      ModerationAction[]
+  typingPulses           TypingPulse[]
+  deskSessions           DeskSession[]
+  reviewOptIns           ReviewOptIn[]
+  officeQueue            OfficeQueueEntry[]
+  thanksGiven            AssignmentThanks[] @relation("ThanksFrom")
+  thanksReceived         AssignmentThanks[] @relation("ThanksTo")
+  taskOffers             TaskOffer[]
+  walksOwned             WalkCheck[]        @relation("WalkOwner")
+  walksWatched           WalkCheck[]        @relation("WalkFriend")
+  decisions              AssignmentDecision[]
+  weekShares             WeekShare[]
+  storyCircles           StoryCircle[]
 
   @@unique([email])
   @@map("user")
@@ -162,8 +174,21 @@ model Profile {
   studyPreference      String   @default("")
   allowFriendRequests  Boolean  @default(true)
   tourSeenAt           DateTime?
+  presence             PresenceWord @default(AVAILABLE)
+  shareReadReceipts    Boolean      @default(false)
+  shareTyping          Boolean      @default(false)
+  quietHoursOn         Boolean      @default(false)
+  quietStartMinute     Int          @default(1380)
+  quietEndMinute       Int          @default(420)
+  shareDeadlineLine    Boolean      @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+}
+
+enum PresenceWord {
+  AVAILABLE
+  IN_CLASS
+  FOCUSING
 }
 
 model Institution {
@@ -328,6 +353,7 @@ model Conversation {
   createdAt DateTime             @default(now())
   members   ConversationMember[]
   messages  Message[]
+  typing    TypingPulse[]
 }
 
 model ConversationMember {
@@ -350,11 +376,22 @@ model Message {
   createdAt      DateTime     @default(now())
   editedAt       DateTime?
   deletedAt      DateTime?
+  parentId       String?
+  pinnedAt       DateTime?
+  visibleAt      DateTime     @default(now())
+  notified       Boolean      @default(true)
+  kind           String       @default("text")
+  attachmentPath String?
+  attachmentName String?
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  parent         Message?     @relation("MessageThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies        Message[]    @relation("MessageThread")
   reactions      MessageReaction[]
+  poll           MessagePoll?
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, visibleAt])
 }
 
 model MessageReaction {
@@ -427,6 +464,7 @@ model Story {
   expiresAt DateTime
   createdAt DateTime @default(now())
   author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  circle    StoryCircle[]
 
   @@index([expiresAt])
   @@index([authorId])
@@ -462,6 +500,7 @@ model Community {
   course        Course?             @relation(fields: [courseId], references: [id], onDelete: SetNull)
   members       CommunityMember[]
   posts         Post[]
+  highlight     CommunityHighlight?
 
   @@index([visibility])
 }
@@ -521,6 +560,8 @@ model Course {
   tools          CourseTool[]
   liveMessages   CourseLiveMessage[]
   questions      CourseQuestion[]
+  officeQueue    OfficeQueueEntry[]
+  taskOffers     TaskOffer[]
 
   @@index([institutionId])
 }
@@ -592,6 +633,9 @@ model Assignment {
   submissions  Submission[]
   rubricCriteria RubricCriterion[]
   outcomeLinks OutcomeLink[]
+  decisions    AssignmentDecision[]
+  thanks       AssignmentThanks[]
+  deskSessions DeskSession[]
 
   @@index([courseId, dueAt])
 }
@@ -648,6 +692,7 @@ model Quiz {
   category           GradeCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   questions          Question[]
   attempts           QuizAttempt[]
+  reviews            ReviewOptIn[]
 
   @@index([courseId])
 }
@@ -664,6 +709,7 @@ model Question {
   correctText        String?
   quiz               Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
   options            QuestionOption[]
+  reviews            ReviewOptIn[]
 
   @@index([quizId, position])
 }
@@ -1198,4 +1244,172 @@ model ModerationAction {
   actor     User           @relation(fields: [actorId], references: [id], onDelete: Cascade)
 
   @@index([caseId, createdAt])
+}
+
+model TypingPulse {
+  conversationId String
+  userId         String
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+}
+
+model MessagePoll {
+  messageId String
+  message   Message            @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  options   MessagePollOption[]
+
+  @@id([messageId])
+}
+
+model MessagePollOption {
+  id      String           @id @default(cuid())
+  pollId  String
+  label   String
+  poll    MessagePoll      @relation(fields: [pollId], references: [messageId], onDelete: Cascade)
+  votes   MessagePollVote[]
+
+  @@index([pollId])
+}
+
+model MessagePollVote {
+  optionId String
+  userId   String
+  option   MessagePollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  @@id([optionId, userId])
+}
+
+model StoryCircle {
+  storyId String
+  userId  String
+  story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([storyId, userId])
+}
+
+model CommunityHighlight {
+  communityId String
+  imagePath   String
+  caption     String    @default("")
+  savedById   String
+  createdAt   DateTime  @default(now())
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+
+  @@id([communityId])
+}
+
+model DeskSession {
+  id              String     @id @default(cuid())
+  userId          String
+  assignmentId    String
+  courseId        String
+  assignmentTitle String
+  showFriends     Boolean    @default(false)
+  endsAt          DateTime
+  createdAt       DateTime   @default(now())
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment      Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, endsAt])
+  @@index([courseId, endsAt])
+  @@index([userId])
+}
+
+model ReviewOptIn {
+  quizId     String
+  questionId String
+  userId     String
+  createdAt  DateTime @default(now())
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, userId])
+  @@index([quizId])
+}
+
+model OfficeQueueEntry {
+  id           String   @id @default(cuid())
+  courseId     String
+  studentId    String
+  studentName  String
+  assignmentId String   @default("")
+  reason       String
+  note         String   @default("")
+  status       String   @default("waiting")
+  createdAt    DateTime @default(now())
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student      User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, createdAt])
+}
+
+model AssignmentThanks {
+  assignmentId String
+  fromUserId   String
+  toUserId     String
+  createdAt    DateTime   @default(now())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  fromUser     User       @relation("ThanksFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser       User       @relation("ThanksTo", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@id([assignmentId, fromUserId])
+  @@index([toUserId])
+}
+
+model TaskOffer {
+  id            String   @id @default(cuid())
+  userId        String
+  userName      String
+  courseId      String
+  finishedLabel String
+  freeStart     DateTime
+  freeEnd       DateTime
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, freeStart])
+}
+
+model WalkCheck {
+  id        String    @id @default(cuid())
+  userId    String
+  friendId  String
+  place     String
+  dueAt     DateTime
+  arrivedAt DateTime?
+  endedAt   DateTime?
+  alertedAt DateTime?
+  createdAt DateTime  @default(now())
+  owner     User      @relation("WalkOwner", fields: [userId], references: [id], onDelete: Cascade)
+  friend    User      @relation("WalkFriend", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@index([friendId, dueAt])
+  @@index([userId])
+}
+
+model AssignmentDecision {
+  id           String     @id @default(cuid())
+  assignmentId String
+  authorId     String
+  authorName   String
+  body         String
+  createdAt    DateTime   @default(now())
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, createdAt])
+}
+
+model WeekShare {
+  userId    String
+  weekStart DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, weekStart])
 }

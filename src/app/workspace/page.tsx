@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReplayTourButton } from "@/components/shell/welcome-tour";
 import { workspaceHome } from "@/server/campus/actions";
+import { deskLoop } from "@/server/campus-loop/actions";
 
 export const metadata = { title: "Workspace" };
 
@@ -31,6 +32,7 @@ function daypart(date: Date) {
 
 export default async function WorkspacePage() {
   const home = await workspaceHome();
+  const loop = await deskLoop();
   const now = new Date();
   const desk: DeskItem[] = [
     ...home.deadlines.assignments.map((assignment) => ({
@@ -80,6 +82,39 @@ export default async function WorkspacePage() {
           ? ` · ${home.progress.submitted} of ${home.progress.published} published assignment${home.progress.published === 1 ? "" : "s"} submitted`
           : ""}
         {home.unread > 0 ? ` · ${home.unread} unread notification${home.unread === 1 ? "" : "s"}` : ""}
+      </p>
+      {loop.soonQuiz ? (
+        <section className="mt-8 max-w-xl">
+          <p className="kicker">This course steps forward</p>
+          <h2 className="mt-3 font-display text-3xl">{loop.soonQuiz.courseTitle}</h2>
+          <p className="mt-2 text-sm leading-6 text-ink-soft">
+            {loop.soonQuiz.title} closes {loop.soonQuiz.closeAt.toLocaleString()}. The feed is stepped back until then.
+          </p>
+          <Link href={loop.soonQuiz.href} className="mt-4 inline-flex text-sm text-ink underline-offset-4 hover:underline">
+            Open the quiz
+          </Link>
+        </section>
+      ) : null}
+      {loop.together.length > 0 ? (
+        <ul className="mt-6 grid gap-2 text-sm text-ink-soft">
+          {loop.together.map((session) => (
+            <li key={`${session.name}-${session.assignmentTitle}`}>
+              {session.name} is on {session.assignmentTitle}. Until {session.endsAt.toLocaleTimeString()}. No camera.
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {loop.friendLines.length > 0 ? (
+        <ul className="mt-4 grid gap-1 text-sm text-ink-soft">
+          {loop.friendLines.map((line) => (
+            <li key={`${line.name}-${line.quizTitle}`}>{line.name} has a quiz coming up · {line.quizTitle}</li>
+          ))}
+        </ul>
+      ) : null}
+      <p className="mt-4 text-sm">
+        <Link href="/workspace/week" className="text-ink underline-offset-4 hover:underline">
+          {loop.sunday ? "Your week is ready" : "Your week"}
+        </Link>
       </p>
       <div className="mt-4">
         <ReplayTourButton />

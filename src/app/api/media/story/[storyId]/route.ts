@@ -16,7 +16,7 @@ export async function GET(
   }
 
   const { storyId } = await context.params;
-  const story = await prisma.story.findUnique({ where: { id: storyId } });
+  const story = await prisma.story.findUnique({ where: { id: storyId }, include: { circle: { select: { userId: true } } } });
   if (!story) {
     return new NextResponse(null, { status: 404 });
   }
@@ -32,7 +32,7 @@ export async function GET(
     sameInstitution: await sameInstitution(userId, story.authorId),
     expired: story.expiresAt <= new Date(),
   });
-  if (!allowed) {
+  if (!allowed || (story.circle.length > 0 && story.authorId !== userId && !story.circle.some((row) => row.userId === userId))) {
     return new NextResponse(null, { status: 404 });
   }
 
