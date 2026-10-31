@@ -1,0 +1,11 @@
+{
+  "name": "Campus+",
+  "short_name": "Campus+",
+  "start_url": "/workspace",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#1c1915",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

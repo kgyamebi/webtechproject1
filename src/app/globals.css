@@ -1,0 +1,391 @@
+@import "tailwindcss";
+
+:root {
+  --canvas: #f4f1ea;
+  --paper: #fbf9f4;
+  --ink: #1c1915;
+  --ink-soft: #5c564c;
+  --line: #ddd6c8;
+  --pine: #1b5e4a;
+  --pine-deep: #143f34;
+  --brass: #8a6232;
+  --coral: #9d3b32;
+  --on-accent: #f7f4ee;
+  --shadow: none;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration: 160ms;
+  --radius: 2px;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-pine: var(--pine);
+  --color-pine-deep: var(--pine-deep);
+  --color-brass: var(--brass);
+  --color-coral: var(--coral);
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-fraunces);
+}
+
+html {
+  height: 100%;
+  color-scheme: light;
+}
+
+body {
+  min-height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-fraunces), serif;
+  font-weight: 520;
+  letter-spacing: -0.03em;
+}
+
+.workspace-shell h1 {
+  font-size: 1.75rem;
+  line-height: 1.15;
+}
+
+.workspace-shell h1.greeting {
+  font-size: clamp(3.4rem, 7vw, 6.25rem);
+  line-height: 0.9;
+  font-weight: 460;
+  letter-spacing: -0.045em;
+}
+
+.workspace-shell h1.stage-title {
+  font-size: clamp(2.6rem, 4vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+.page-enter {
+  animation: stage-in 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stage-in {
+  from {
+    transform: translateY(22px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.nav-link {
+  transition: color 320ms cubic-bezier(0.16, 1, 0.3, 1), transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nav-link:hover {
+  transform: translateX(3px);
+}
+
+.kicker {
+  font-family: var(--font-outfit), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.ruled-row {
+  display: grid;
+  grid-template-columns: 7.5rem 1fr;
+  gap: 1rem;
+  border-top: 1px solid var(--line);
+  padding: 0.85rem 0;
+}
+
+.ruled-row:last-child {
+  border-bottom: 1px solid var(--line);
+}
+
+:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 3px;
+}
+
+@keyframes campus-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.campus-rise {
+  animation: campus-rise var(--duration) var(--ease-out) both;
+}
+
+.campus-rise-late {
+  animation: campus-rise 320ms var(--ease-out) 80ms both;
+}
+
+@keyframes tour-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.tour-card {
+  animation: tour-enter 480ms var(--ease-out) both;
+}
+
+.tour-step {
+  animation: tour-enter 320ms var(--ease-out) both;
+}
+
+.tour-bar {
+  transition: width 320ms var(--ease-out);
+}
+
+.tour-dot {
+  transition: transform 280ms var(--ease-out), background-color 280ms var(--ease-out);
+}
+
+.tour-stage {
+  position: relative;
+  height: 11.5rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--canvas);
+  padding: 0.85rem 0.9rem 2.1rem;
+}
+
+.tour-caption {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.55rem;
+  left: 0.75rem;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+html[data-tour="desk"] a[href="/workspace"],
+html[data-tour="learn"] a[href="/workspace/learn"],
+html[data-tour="learn"] a[href="/workspace/calendar"],
+html[data-tour="connect"] a[href="/workspace/people"],
+html[data-tour="connect"] a[href="/workspace/connect"],
+html[data-tour="minor"] a[href="/workspace/people"],
+html[data-tour="campus"] a[href="/workspace/messages"],
+html[data-tour="campus"] a[href="/workspace/events"],
+html[data-tour="campus"] a[href="/workspace/settings"] {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+  animation: tour-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes tour-glow {
+  50% { outline-offset: 6px; }
+}
+
+.tour-pointer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  animation: tour-pointer 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sim {
+  animation: sim-arrive 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sim-d1 { animation-delay: 180ms; }
+.sim-d2 { animation-delay: 460ms; }
+.sim-d3 { animation-delay: 760ms; }
+.sim-d4 { animation-delay: 1040ms; }
+
+.sim-press {
+  animation: sim-press 2.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sim-meet {
+  animation: sim-meet 1.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.sim-fill {
+  transform-origin: left center;
+  animation: sim-fill 900ms cubic-bezier(0.16, 1, 0.3, 1) 700ms both;
+}
+
+.sim-draw {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  animation: sim-draw 500ms cubic-bezier(0.16, 1, 0.3, 1) 900ms both;
+}
+
+.sim-draw-late {
+  animation-delay: 1200ms;
+}
+
+.tour-cursor {
+  position: absolute;
+  z-index: 2;
+  width: 0.55rem;
+  height: 0.55rem;
+  border: 1.5px solid var(--ink);
+  border-radius: 50%;
+  background: var(--paper);
+  offset-path: path("M 12 18 L 28 52 L 40 78");
+  animation: tour-cursor 2.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.tour-stage[data-scene="learn"] .tour-cursor {
+  offset-path: path("M 120 20 L 28 22 L 36 28");
+}
+
+.tour-stage[data-scene="connect"] .tour-cursor {
+  offset-path: path("M 40 70 L 150 36 L 150 36");
+}
+
+.tour-stage[data-scene="minor"] .tour-cursor {
+  offset-path: path("M 16 16 L 24 42 L 24 78");
+}
+
+.tour-stage[data-scene="campus"] .tour-cursor {
+  offset-path: path("M 20 16 L 24 22 L 24 52 L 24 82");
+}
+
+@keyframes tour-cursor {
+  0% { offset-distance: 0%; opacity: 0; transform: scale(1); }
+  12% { opacity: 1; }
+  70% { offset-distance: 100%; transform: scale(1); }
+  82% { offset-distance: 100%; transform: scale(0.7); }
+  100% { offset-distance: 100%; opacity: 0.85; transform: scale(1); }
+}
+
+@keyframes sim-arrive {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes sim-press {
+  0% { background: transparent; }
+  35% { background: transparent; }
+  48% { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+  100% { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+}
+
+@keyframes sim-meet {
+  from { transform: translateX(var(--from-x, 0)); }
+  to { transform: translateX(0); }
+}
+
+@keyframes sim-fill {
+  from { transform: scaleX(0.08); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes sim-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes tour-pointer {
+  0% { opacity: 0; transform: translate(10px, 16px); }
+  12% { opacity: 1; transform: translate(10px, 16px); }
+  42% { transform: translate(18px, 46px); }
+  68% { transform: translate(28px, 78px) scale(0.8); }
+  100% { opacity: 0; transform: translate(36px, 92px); }
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    color-scheme: dark;
+  }
+
+  :root {
+    --canvas: #141311;
+    --paper: #1c1b18;
+    --ink: #f3efe6;
+    --ink-soft: #b7b0a4;
+    --line: #34302a;
+    --pine: #8fbfa8;
+    --pine-deep: #d5ebe0;
+    --brass: #d2b48a;
+    --coral: #e0a097;
+    --on-accent: #141311;
+    --shadow: none;
+  }
+}
+
+.connect-app {
+  visibility: visible;
+  --screen: #f6f3ec;
+  --screen-ink: #17211e;
+  --screen-soft: #5c6b64;
+  --bubble-me: #1c6b57;
+  --bubble-me-ink: #f7fffc;
+  --bubble-them: #ffffff;
+  --bubble-them-ink: #17211e;
+  --composer: #fffdf8;
+  --hairline: #e4dacb;
+  color: var(--screen-ink);
+  background: #e7e1d6;
+}
+
+.connect-app .text-ink {
+  color: var(--screen-ink);
+}
+
+.connect-app .text-ink-soft {
+  color: var(--screen-soft);
+}
+
+@media (prefers-color-scheme: dark) {
+  .connect-app {
+    --screen: #121614;
+    --screen-ink: #f3f6f4;
+    --screen-soft: #b7c4bd;
+    --bubble-me: #1f7a64;
+    --bubble-me-ink: #f4fffb;
+    --bubble-them: #24302c;
+    --bubble-them-ink: #f3f6f4;
+    --composer: #1a211e;
+    --hairline: #31403a;
+    background: #0c0f0e;
+    color: var(--screen-ink);
+  }
+}
+
+body:has(.connect-app) .workspace-shell {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: campus
+      POSTGRES_PASSWORD: campus
+      POSTGRES_DB: campus_plus
+    ports:
+      - "5432:5432"
+    volumes:
+      - campus_plus_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus -d campus_plus"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  campus_plus_pg:

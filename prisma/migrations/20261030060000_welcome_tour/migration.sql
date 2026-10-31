@@ -1,0 +1,1 @@
+ALTER TABLE "Profile" ADD COLUMN "tourSeenAt" TIMESTAMP(3);
